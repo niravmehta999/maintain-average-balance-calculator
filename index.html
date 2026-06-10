@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Average Balance Calculator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50 flex items-start justify-center pt-12 px-4">
+  <div class="bg-white rounded-2xl shadow-lg w-full max-w-md p-8">
+
+    <h1 class="text-2xl font-bold text-gray-800 mb-1">Average Balance Calculator</h1>
+    <p class="text-sm text-gray-500 mb-6">Calculate the required daily balance to meet your quarterly average target</p>
+
+    <!-- Inputs -->
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+        <input id="startDate" type="date"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+        <input id="endDate" type="date"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Current Average Balance (₹)</label>
+        <div class="relative">
+          <span class="absolute left-3 top-2 text-sm text-gray-400">₹</span>
+          <input id="currentAvg" type="number" min="0" step="1" placeholder="0"
+            class="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <p class="text-xs text-gray-400 mt-1">Average of daily closing balances from start date to today</p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Minimum Required Balance (₹)</label>
+        <div class="relative">
+          <span class="absolute left-3 top-2 text-sm text-gray-400">₹</span>
+          <input id="minBalance" type="number" min="0" step="1" value="50000"
+            class="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+      </div>
+    </div>
+
+    <button onclick="calculate()"
+      class="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-2.5 text-sm transition-colors">
+      Calculate
+    </button>
+
+    <!-- Error -->
+    <div id="error" class="hidden mt-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3"></div>
+
+    <!-- Results -->
+    <div id="results" class="hidden mt-6">
+      <hr class="mb-5 border-gray-200" />
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Results</h2>
+
+      <div class="space-y-2 text-sm">
+        <div class="flex justify-between">
+          <span class="text-gray-500">Today (IST)</span>
+          <span id="r-today" class="font-medium text-gray-800"></span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-gray-500">Quarter days (total)</span>
+          <span id="r-total" class="font-medium text-gray-800"></span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-gray-500">Days passed</span>
+          <span id="r-passed" class="font-medium text-gray-800"></span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-gray-500">Remaining days</span>
+          <span id="r-remaining" class="font-medium text-gray-800"></span>
+        </div>
+      </div>
+
+      <!-- Required amount card -->
+      <div id="r-card" class="mt-5 rounded-xl p-4 text-center">
+        <p id="r-label" class="text-xs font-semibold uppercase tracking-wide mb-1"></p>
+        <p id="r-amount" class="text-3xl font-bold"></p>
+        <p id="r-sub" class="text-xs mt-1"></p>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function getTodayIST() {
+      // Get current time, offset to IST (UTC+5:30 = +330 minutes)
+      const now = new Date();
+      const istOffset = 330; // minutes
+      const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+      const istDate = new Date(utcMs + istOffset * 60000);
+      // Return as YYYY-MM-DD string
+      const y = istDate.getFullYear();
+      const m = String(istDate.getMonth() + 1).padStart(2, '0');
+      const d = String(istDate.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function parseDate(str) {
+      // Parse YYYY-MM-DD as local midnight (no timezone shift)
+      const [y, m, d] = str.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    function diffDaysInclusive(a, b) {
+      // Days between two Date objects, inclusive of both endpoints
+      const msPerDay = 24 * 60 * 60 * 1000;
+      return Math.round((b - a) / msPerDay) + 1;
+    }
+
+    function formatDate(ymd) {
+      const [y, m, d] = ymd.split('-').map(Number);
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return `${d} ${months[m - 1]} ${y}`;
+    }
+
+    function formatINR(n) {
+      return '₹ ' + Math.round(n).toLocaleString('en-IN');
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      document.getElementById('results').classList.add('hidden');
+    }
+
+    function calculate() {
+      document.getElementById('error').classList.add('hidden');
+
+      const startStr  = document.getElementById('startDate').value;
+      const endStr    = document.getElementById('endDate').value;
+      const currentAvg = parseFloat(document.getElementById('currentAvg').value);
+      const minBalance = parseFloat(document.getElementById('minBalance').value);
+
+      if (!startStr || !endStr) return showError('Please select both Start Date and End Date.');
+      if (isNaN(currentAvg) || currentAvg < 0) return showError('Please enter a valid Current Average Balance.');
+      if (isNaN(minBalance) || minBalance <= 0) return showError('Please enter a valid Minimum Required Balance.');
+
+      const todayStr = getTodayIST();
+      const startDate = parseDate(startStr);
+      const endDate   = parseDate(endStr);
+      const todayDate = parseDate(todayStr);
+
+      if (endDate <= startDate) return showError('End Date must be after Start Date.');
+      if (todayDate < startDate) return showError('Today is before the Start Date — the quarter has not started yet.');
+      if (todayDate > endDate)  return showError('Today is after the End Date — the quarter has already ended.');
+
+      const total_no_of_days = diffDaysInclusive(startDate, endDate);
+      const days_passed      = diffDaysInclusive(startDate, todayDate);
+      const remaining_days   = total_no_of_days - days_passed;
+
+      const sum_so_far           = currentAvg * days_passed;
+      const total_sum_needed     = minBalance * total_no_of_days;
+      const remaining_sum_needed = total_sum_needed - sum_so_far;
+      const required_daily       = remaining_days > 0 ? remaining_sum_needed / remaining_days : 0;
+
+      // Populate results
+      document.getElementById('r-today').textContent     = formatDate(todayStr);
+      document.getElementById('r-total').textContent     = total_no_of_days + ' days';
+      document.getElementById('r-passed').textContent    = days_passed + ' days';
+      document.getElementById('r-remaining').textContent = remaining_days + ' days';
+
+      const card   = document.getElementById('r-card');
+      const label  = document.getElementById('r-label');
+      const amount = document.getElementById('r-amount');
+      const sub    = document.getElementById('r-sub');
+
+      if (remaining_days === 0) {
+        // Last day of quarter
+        card.className = 'mt-5 rounded-xl p-4 text-center bg-yellow-50';
+        label.className = 'text-xs font-semibold uppercase tracking-wide mb-1 text-yellow-700';
+        label.textContent = 'Last Day of Quarter';
+        amount.className = 'text-2xl font-bold text-yellow-800';
+        amount.textContent = 'Today is the last day';
+        sub.className = 'text-xs mt-1 text-yellow-600';
+        sub.textContent = 'No remaining days to adjust.';
+      } else if (required_daily <= 0) {
+        // Already covered — sum accumulated exceeds full quarter target
+        const projected_avg = (sum_so_far + minBalance * remaining_days) / total_no_of_days;
+        card.className = 'mt-5 rounded-xl p-4 text-center bg-green-50';
+        label.className = 'text-xs font-semibold uppercase tracking-wide mb-1 text-green-700';
+        label.textContent = 'Target Already Met';
+        amount.className = 'text-3xl font-bold text-green-700';
+        amount.textContent = '✓ On Track';
+        sub.className = 'text-xs mt-2 text-green-600 space-y-1';
+        sub.innerHTML = 'Your accumulated balance already covers the full quarter target.'
+          + `<br/><span class="block mt-2 font-medium">Projected quarter average: ${formatINR(projected_avg)}</span>`
+          + `<span class="block text-green-500">(if you maintain ${formatINR(minBalance)} for remaining ${remaining_days} days)</span>`;
+      } else if (required_daily <= minBalance) {
+        // On track — required is ≤ minimum, so even keeping minimum works
+        const excess_kept   = (currentAvg - minBalance) * days_passed;
+        const projected_avg = (sum_so_far + minBalance * remaining_days) / total_no_of_days;
+        card.className = 'mt-5 rounded-xl p-4 text-center bg-green-50';
+        label.className = 'text-xs font-semibold uppercase tracking-wide mb-1 text-green-700';
+        label.textContent = 'Required Daily Balance';
+        amount.className = 'text-3xl font-bold text-green-700';
+        amount.textContent = formatINR(required_daily);
+        sub.className = 'text-xs mt-2 text-green-600';
+        sub.innerHTML = `You're on track — this is ≤ your minimum target of ${formatINR(minBalance)}.`
+          + (currentAvg > minBalance
+            ? `<br/><span class="block mt-2 font-medium">Excess kept so far: ${formatINR(excess_kept)}</span>`
+              + `<span class="block text-green-500">You've kept ${formatINR(currentAvg - minBalance)}/day above minimum over ${days_passed} days</span>`
+            : '')
+          + `<br/><span class="block mt-2 font-medium">Projected quarter average: ${formatINR(projected_avg)}</span>`
+          + `<span class="block text-green-500">(if you maintain ${formatINR(minBalance)} for remaining ${remaining_days} days)</span>`;
+      } else {
+        // Needs higher balance
+        card.className = 'mt-5 rounded-xl p-4 text-center bg-orange-50';
+        label.className = 'text-xs font-semibold uppercase tracking-wide mb-1 text-orange-700';
+        label.textContent = 'Required Daily Balance';
+        amount.className = 'text-3xl font-bold text-orange-700';
+        amount.textContent = formatINR(required_daily);
+        sub.className = 'text-xs mt-1 text-orange-600';
+        sub.textContent = `Keep this amount daily for the remaining ${remaining_days} days to meet your target.`;
+      }
+
+      document.getElementById('results').classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>
