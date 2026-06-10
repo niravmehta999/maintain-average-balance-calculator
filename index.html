@@ -180,7 +180,7 @@
         sub.textContent = 'No remaining days to adjust.';
       } else if (required_daily <= 0) {
         // Already covered — sum accumulated exceeds full quarter target
-        const projected_avg = (sum_so_far + minBalance * remaining_days) / total_no_of_days;
+        const projected_avg = sum_so_far / total_no_of_days;
         card.className = 'mt-5 rounded-xl p-4 text-center bg-green-50';
         label.className = 'text-xs font-semibold uppercase tracking-wide mb-1 text-green-700';
         label.textContent = 'Target Already Met';
@@ -189,11 +189,11 @@
         sub.className = 'text-xs mt-2 text-green-600 space-y-1';
         sub.innerHTML = 'Your accumulated balance already covers the full quarter target.'
           + `<br/><span class="block mt-2 font-medium">Projected quarter average: ${formatINR(projected_avg)}</span>`
-          + `<span class="block text-green-500">(if you maintain ${formatINR(minBalance)} for remaining ${remaining_days} days)</span>`;
+          + `<span class="block text-green-500">(if you maintain ₹0 for remaining ${remaining_days} days)</span>`;
       } else if (required_daily <= minBalance) {
         // On track — required is ≤ minimum, so even keeping minimum works
         const excess_kept   = (currentAvg - minBalance) * days_passed;
-        const projected_avg = (sum_so_far + minBalance * remaining_days) / total_no_of_days;
+        const projected_avg = sum_so_far / total_no_of_days;
         card.className = 'mt-5 rounded-xl p-4 text-center bg-green-50';
         label.className = 'text-xs font-semibold uppercase tracking-wide mb-1 text-green-700';
         label.textContent = 'Required Daily Balance';
@@ -206,7 +206,7 @@
               + `<span class="block text-green-500">You've kept ${formatINR(currentAvg - minBalance)}/day above minimum over ${days_passed} days</span>`
             : '')
           + `<br/><span class="block mt-2 font-medium">Projected quarter average: ${formatINR(projected_avg)}</span>`
-          + `<span class="block text-green-500">(if you maintain ${formatINR(minBalance)} for remaining ${remaining_days} days)</span>`;
+          + `<span class="block text-green-500">(if you maintain ₹0 for remaining ${remaining_days} days)</span>`;
       } else {
         // Needs higher balance
         card.className = 'mt-5 rounded-xl p-4 text-center bg-orange-50';
